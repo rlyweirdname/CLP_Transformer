@@ -1,0 +1,18 @@
+# Môi trường ảo
+.venv/
+env/
+venv/
+
+# Cache của Python
+__pycache__/
+*.pyc
+
+# Các file hệ thống
+.DS_Store
+
+# (Tùy chọn) Nếu file dataset hoặc file model .pth của bạn quá lớn (>50MB), 
+# bạn có thể bỏ comment 3 dòng dưới đây để không push chúng lên. 
+# Hiện tại file của chúng ta khá nhẹ nên bạn có thể giữ nguyên để các bạn trong nhóm tải về dùng luôn.
+# clp_dataset.json
+# clp_dataset_optimal.json
+# clp_transformer.pth
