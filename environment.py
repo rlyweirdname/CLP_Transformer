@@ -14,6 +14,10 @@ class Item:
         
         self.color = f'rgb({random.randint(50,255)}, {random.randint(50,255)}, {random.randint(50,255)})'
 
+    @property
+    def volume(self):
+        return self.l * self.w * self.h
+
 class Container:
     def __init__(self, length, width, height):
         self.L = length
@@ -23,3 +27,7 @@ class Container:
 
     def add_item(self, item):
         self.packed_items.append(item)
+
+    @property
+    def packed_volume(self):
+        return sum(item.volume for item in self.packed_items)

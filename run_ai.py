@@ -5,22 +5,30 @@ from visualization import draw_3d_container
 from model import Seq2SeqCLP
 
 def get_ai_prediction(model, items):
-    """Sử dụng Transformer để dự đoán thứ tự kiện hàng nên xếp."""
-    model.eval() # Chuyển mô hình sang chế độ suy luận (Inference)
+    """Sử dụng Transformer để dự đoán TỪNG BƯỚC MỘT (Autoregressive)."""
+    model.eval() 
     
     # 1. Chuyển danh sách kiện hàng thành Tensor (Input)
     input_seq = [[item.l, item.w, item.h] for item in items]
     src_tensor = torch.tensor([input_seq], dtype=torch.float32)
     
-    # 2. Tạo một Tensor rỗng làm điểm xuất phát cho Decoder (Target giả)
-    tgt_tensor = torch.zeros_like(src_tensor)
+    # 2. Khởi tạo mảng Target với 1 kiện hàng "giả" (Tọa độ 0) để làm mồi nhử (Start Token)
+    tgt_seq = [[0.0, 0.0, 0.0]]
+    tgt_tensor = torch.tensor([tgt_seq], dtype=torch.float32)
     
-    with torch.no_grad(): # Không tính đạo hàm để chạy nhanh hơn
-        # Mớm cho AI để nó dự đoán chuỗi đầu ra
-        predictions = model(src_tensor, tgt_tensor)
+    with torch.no_grad():
+        # Vòng lặp Tự hồi quy: Dự đoán từng kiện hàng một
+        for _ in range(len(items)):
+            predictions = model(src_tensor, tgt_tensor)
+            
+            # Lấy dự đoán của bước cuối cùng vừa sinh ra
+            next_item = predictions[:, -1:, :]
+            
+            # Nối (Concat) dự đoán mới vào mảng Target để làm manh mối cho bước tiếp theo
+            tgt_tensor = torch.cat([tgt_tensor, next_item], dim=1)
     
-    # Lấy kết quả (batch 0)
-    pred_seq = predictions[0].numpy()
+    # Loại bỏ token mồi nhử [0,0,0] ban đầu, chỉ lấy các dự đoán thực sự
+    pred_seq = tgt_tensor[0, 1:].detach().cpu().numpy()
     return pred_seq
 
 def check_overlap(item1, item2):
@@ -111,9 +119,8 @@ def main():
     print("Khởi tạo môi trường...")
     container = Container(length=20, width=15, height=10)
     
-    # Tạo ngẫu nhiên 20 kiện hàng mới tinh (AI chưa từng thấy)
     items = []
-    for i in range(50):
+    for i in range(80):
         items.append(Item(id=i, l=random.randint(2, 5), w=random.randint(2, 4), h=random.randint(2, 4)))
         
     print("Đang tải mô hình Transformer đã huấn luyện...")
@@ -133,7 +140,6 @@ def main():
     
     print(f"Hoàn tất! AI đã xếp được {len(container.packed_items)}/{len(items)} kiện hàng.")
     
-    # Vẽ mô phỏng 3D
     draw_3d_container(container)
 
 if __name__ == "__main__":

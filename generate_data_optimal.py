@@ -71,26 +71,24 @@ def generate_optimal_dataset(num_samples=2000, items_per_sample=20, filename="cl
         # Tạo ra các kiện hàng vừa khít nhau 100%
         boxes = generate_perfect_packing(L, W, H, items_per_sample)
         
-        # BƯỚC ĐỘT PHÁ: Tạo đáp án (Target)
         # Để dễ xếp, kiện hàng nào ở dưới thấp (z nhỏ), góc trong cùng (y nhỏ, x nhỏ) sẽ phải được bốc ra xếp trước!
         boxes.sort(key=lambda b: (b.z, b.y, b.x))
         
         # Rút trích chỉ lấy kích thước (l, w, h) theo đúng thứ tự đã sort
         target_seq = [[b.l, b.w, b.h] for b in boxes]
         
-        # BƯỚC ĐỘT PHÁ: Tạo đề bài (Input)
-        # Đảo lộn xộn danh sách đi để làm đề bài đố AI
         input_seq = target_seq.copy()
         random.shuffle(input_seq)
         
-        dataset.append({
-            "input": input_seq,
-            "target": target_seq
-        })
+        if len(input_seq) == items_per_sample:
+            dataset.append({
+                "input": input_seq,
+                "target": target_seq
+            })
         
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(dataset, f, indent=4)
-    print(f"✅ Xong! Đã lưu dữ liệu vào '{filename}'. Tỷ lệ lấp đầy mỗi mẫu đều là 100%!")
+    print(f"Xong! Đã lưu dữ liệu vào '{filename}'. Tỷ lệ lấp đầy mỗi mẫu đều là 100%!")
 
 if __name__ == "__main__":
-    generate_optimal_dataset(num_samples=2000, items_per_sample=50)
+    generate_optimal_dataset(num_samples=2000, items_per_sample=80)

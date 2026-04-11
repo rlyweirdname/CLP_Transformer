@@ -27,7 +27,12 @@ def draw_3d_container(container):
     # Vẽ các khối hàng
     for item in container.packed_items:
         add_box(item.x, item.y, item.z, item.l, item.w, item.h, item.color, f'Kiện {item.id}')
+    # Tính toán Thống kê Tỷ lệ lấp đầy
+    total_item_vol = sum([item.l * item.w * item.h for item in container.packed_items])
+    container_vol = container.L * container.W * container.H
+    utilization = (total_item_vol / container_vol) * 100
 
+    # Cập nhật tiêu đề đồ thị (Title)
     fig.update_layout(
         scene=dict(
             xaxis=dict(title='Chiều dài (L)', range=[0, container.L]),
@@ -35,7 +40,7 @@ def draw_3d_container(container):
             zaxis=dict(title='Chiều cao (H)', range=[0, container.H]),
             aspectmode='data'
         ),
-        title='Mô phỏng Xếp Container 3D - Phân tích và Thiết kế thuật toán',
+        title=f'Mô phỏng Xếp Container 3D | Tỷ lệ lấp đầy: {utilization:.2f}% | Đã xếp: {len(container.packed_items)} kiện',
         margin=dict(l=0, r=0, b=0, t=40)
     )
     fig.show()

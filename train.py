@@ -64,7 +64,7 @@ def train_model():
         
     # Lưu lại mô hình sau khi học xong
     torch.save(model.state_dict(), "clp_transformer.pth")
-    print("✅ Đã huấn luyện xong và lưu mô hình vào file 'clp_transformer.pth'!")
+    print("Đã huấn luyện xong và lưu mô hình vào file 'clp_transformer.pth'!")
 
 if __name__ == "__main__":
     train_model()

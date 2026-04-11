@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô phỏng AI Xếp Container 3D - BTL Nhóm 6</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js cho Đồ họa 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls để xoay camera -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; }
+        #canvas-container { width: 100%; height: 100vh; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        
+        /* Hiệu ứng loading Transformer */
+        .ai-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="flex text-slate-200 font-sans">
+
+    <!-- Bảng điều khiển bên trái -->
+    <div class="w-96 bg-slate-900 border-r border-slate-700 h-screen flex flex-col z-10 shadow-2xl relative">
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-xl font-bold text-blue-400 mb-1"><i class="fa-solid fa-cube mr-2"></i>CLP - Nhóm 6</h1>
+            <p class="text-xs text-slate-400">Thuật toán: Transformer Seq2Seq + Extreme Points 6D</p>
+        </div>
+
+        <!-- Thống kê -->
+        <div class="p-6 border-b border-slate-700 bg-slate-800/50">
+            <div class="flex justify-between mb-2">
+                <span class="text-sm font-semibold">Tỷ lệ lấp đầy:</span>
+                <span id="utilization-text" class="text-sm font-bold text-emerald-400">0.00%</span>
+            </div>
+            <div class="w-full bg-slate-700 rounded-full h-2.5 mb-4">
+                <div id="utilization-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-slate-400">
+                <span>Đã xếp: <strong id="packed-count" class="text-slate-200">0</strong>/<span id="total-count">0</span> kiện</span>
+                <span>Thể tích: <span id="volume-count">0</span> / <span id="container-volume">0</span></span>
+            </div>
+        </div>
+
+        <!-- Các nút điều khiển -->
+        <div class="p-6 border-b border-slate-700 space-y-3">
+            <button id="btn-generate" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center">
+                <i class="fa-solid fa-rotate mr-2"></i> Sinh Dữ Liệu Mới
+            </button>
+            <div class="flex space-x-2">
+                <button id="btn-step" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" disabled>
+                    <i class="fa-solid fa-shoe-prints mr-2"></i> Chạy Từng Bước
+                </button>
+                <button id="btn-auto" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" disabled>
+                    <i class="fa-solid fa-play mr-2"></i> Chạy Tự Động
+                </button>
+            </div>
+        </div>
+
+        <!-- Log thuật toán (Cực kỳ quan trọng để thuyết trình) -->
+        <div class="p-4 bg-slate-950 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+            <h3 class="text-xs uppercase font-bold text-slate-500 mb-3 tracking-wider">Luồng Thực Thi AI</h3>
+            <div id="log-container" class="space-y-2 text-xs font-mono">
+                <div class="text-slate-400">Hệ thống sẵn sàng. Nhấn 'Sinh Dữ Liệu Mới' để bắt đầu.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Khu vực vẽ 3D -->
+    <div id="canvas-container" class="flex-1 relative cursor-move">
+        <!-- AI Processing Overlay -->
+        <div id="ai-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
+            <i class="fa-solid fa-microchip text-6xl text-blue-500 mb-4 ai-pulse"></i>
+            <h2 class="text-2xl font-bold text-white mb-2">Mạng Transformer đang suy luận...</h2>
+            <p class="text-slate-300">Tính toán ma trận Self-Attention & Sequence Prediction</p>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. CẤU TRÚC DỮ LIỆU & THUẬT TOÁN LÕI (JS Port từ Python)
+        // ==========================================
+        class Item {
+            constructor(id, l, w, h) {
+                this.id = id;
+                this.l = l; this.w = w; this.h = h;
+                this.x = 0; this.y = 0; this.z = 0;
+                this.isPacked = false;
+                this.volume = l * w * h;
+                // Màu ngẫu nhiên tươi sáng
+                const hue = Math.floor(Math.random() * 360);
+                this.color = `hsl(${hue}, 70%, 60%)`;
+                this.mesh = null;
+            }
+        }
+
+        const ContainerConfig = { L: 20, W: 15, H: 10 };
+        let items = [];
+        let packedItems = [];
+        let validPoints = []; // Danh sách Extreme Points
+        
+        // Trạng thái điều khiển
+        let isAutoPlaying = false;
+        let currentItemIndex = 0;
+        let autoPlayInterval;
+
+        // Hàm kiểm tra đụng độ (AABB)
+        function checkOverlap(item1, item2) {
+            return !(item1.x + item1.l <= item2.x ||
+                     item1.x >= item2.x + item2.l ||
+                     item1.y + item1.w <= item2.y ||
+                     item1.y >= item2.y + item2.w ||
+                     item1.z + item1.h <= item2.z ||
+                     item1.z >= item2.z + item2.h);
+        }
+
+        // Sinh 6 hướng xoay
+        function getRotations(l, w, h) {
+            const rots = [
+                [l, w, h], [l, h, w], 
+                [w, l, h], [w, h, l], 
+                [h, l, w], [h, w, l]
+            ];
+            // Lọc trùng lặp bằng Stringify
+            const unique = [];
+            const seen = new Set();
+            for (let r of rots) {
+                const str = r.join(',');
+                if (!seen.has(str)) {
+                    seen.add(str);
+                    unique.push(r);
+                }
+            }
+            return unique;
+        }
+
+        // ==========================================
+        // 2. LOGIC ĐỒ HỌA 3D VỚI THREE.JS
+        // ==========================================
+        const containerDiv = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); // Khớp màu nền Tailwind slate-900
+
+        // Camera hướng chéo từ trên xuống
+        const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 384) / window.innerHeight, 0.1, 1000);
+        camera.position.set(30, 25, 40);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth - 384, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        containerDiv.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(ContainerConfig.L/2, ContainerConfig.H/2, ContainerConfig.W/2);
+        controls.update();
+
+        // Ánh sáng
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(10, 50, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Vẽ Lưới (Grid) và Trục
+        const gridHelper = new THREE.GridHelper(40, 40, 0x334155, 0x1e293b);
+        gridHelper.position.y = -0.01; // Thấp hơn sàn 1 xíu để tránh z-fighting
+        scene.add(gridHelper);
+
+        let containerMesh;
+
+        function init3DEnvironment() {
+            // Xóa các khối cũ
+            while(scene.children.length > 0){ 
+                scene.remove(scene.children[0]); 
+            }
+            scene.add(ambientLight);
+            scene.add(dirLight);
+            scene.add(gridHelper);
+
+            // Vẽ khung Container (Wireframe)
+            // LƯU Ý HỆ TỌA ĐỘ THREE.JS: X (ngang), Y (cao), Z (sâu). 
+            // Thuật toán của ta: L (ngang), H (cao), W (sâu). Nên map Z của ta -> Y của Three, Y của ta -> Z của Three.
+            const geo = new THREE.BoxGeometry(ContainerConfig.L, ContainerConfig.H, ContainerConfig.W);
+            const edges = new THREE.EdgesGeometry(geo);
+            containerMesh = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x38bdf8, opacity: 0.5, transparent: true }));
+            // Đưa gốc tọa độ về góc thay vì tâm
+            containerMesh.position.set(ContainerConfig.L/2, ContainerConfig.H/2, ContainerConfig.W/2);
+            scene.add(containerMesh);
+        }
+
+        function drawItemIn3D(item) {
+            const geo = new THREE.BoxGeometry(item.l, item.h, item.w); // Map: Algo H -> Three Y
+            
+            // Chất liệu màu sắc
+            const mat = new THREE.MeshLambertMaterial({ 
+                color: item.color, 
+                transparent: true,
+                opacity: 0.85
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            
+            // Viền đen cho khối hộp
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
+            mesh.add(line);
+
+            // Định vị: Threejs đặt ở tâm, Thuật toán đặt ở góc (x,y,z)
+            // Chuyển đổi: 
+            // Three X = item.x + item.l/2
+            // Three Y (Cao) = item.z + item.h/2
+            // Three Z (Sâu) = item.y + item.w/2
+            mesh.position.set(item.x + item.l/2, item.z + item.h/2, item.y + item.w/2);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            scene.add(mesh);
+            item.mesh = mesh; // Lưu lại tham chiếu để xóa nếu cần
+        }
+
+        // Vòng lặp Render
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Xử lý Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = (window.innerWidth - 384) / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth - 384, window.innerHeight);
+        });
+
+        // ==========================================
+        // 3. LOGIC GIAO DIỆN & TRÌNH DIỄN THUẬT TOÁN
+        // ==========================================
+        const logContainer = document.getElementById('log-container');
+        const btnGen = document.getElementById('btn-generate');
+        const btnStep = document.getElementById('btn-step');
+        const btnAuto = document.getElementById('btn-auto');
+
+        function addLog(msg, type = 'info') {
+            const div = document.createElement('div');
+            if(type === 'success') div.className = 'text-emerald-400 font-bold';
+            else if(type === 'warning') div.className = 'text-amber-400';
+            else if(type === 'error') div.className = 'text-rose-400';
+            else if(type === 'ai') div.className = 'text-blue-400 border-l-2 border-blue-500 pl-2';
+            else div.className = 'text-slate-300';
+            
+            div.innerHTML = `<span class="opacity-50">[${new Date().toLocaleTimeString().split(' ')[0]}]</span> ${msg}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function updateStats() {
+            document.getElementById('total-count').innerText = items.length;
+            document.getElementById('packed-count').innerText = packedItems.length;
+            
+            const totalVol = packedItems.reduce((sum, item) => sum + item.volume, 0);
+            const maxVol = ContainerConfig.L * ContainerConfig.W * ContainerConfig.H;
+            const util = (totalVol / maxVol) * 100;
+            
+            document.getElementById('volume-count').innerText = totalVol;
+            document.getElementById('container-volume').innerText = maxVol;
+            
+            document.getElementById('utilization-text').innerText = util.toFixed(2) + '%';
+            document.getElementById('utilization-bar').style.width = util + '%';
+        }
+
+        // BƯỚC 1: Sinh Dữ Liệu & GỌI API PYTHON 
+        btnGen.addEventListener('click', () => {
+            items = []; packedItems = []; validPoints = [[0,0,0]];
+            currentItemIndex = 0;
+            isAutoPlaying = false;
+            clearInterval(autoPlayInterval);
+            logContainer.innerHTML = '';
+            init3DEnvironment();
+            
+            btnStep.disabled = true;
+            btnAuto.disabled = true;
+
+            addLog("Đang khởi tạo danh sách kiện hàng ngẫu nhiên...", "info");
+            for(let i=0; i<60; i++) {
+                items.push(new Item(i, Math.floor(Math.random()*4)+2, Math.floor(Math.random()*3)+2, Math.floor(Math.random()*3)+2));
+            }
+            updateStats();
+
+            const overlay = document.getElementById('ai-overlay');
+            overlay.classList.remove('hidden');
+            addLog("Gửi dữ liệu qua cổng API 5000 cho PyTorch xử lý...", "ai");
+            
+            // GỌI API ĐẾN PYTHON BACKEND
+            fetch('http://localhost:5000/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items }) // Gửi 60 kiện hàng đi
+            })
+            .then(response => response.json())
+            .then(data => {
+                const predictedSeq = data.predicted_sequence;
+
+                // Bắt cặp dự đoán của AI với các kiện hàng thực tế (Giống file run_ai.py)
+                let aiSortedItems = [];
+                let unpackedItems = [...items];
+
+                for (let predDims of predictedSeq) {
+                    if (unpackedItems.length === 0) break;
+                    
+                    let bestMatchIdx = 0;
+                    let minDiff = Infinity;
+                    
+                    for (let i = 0; i < unpackedItems.length; i++) {
+                        let diff = Math.abs(unpackedItems[i].l - predDims[0]) +
+                                   Math.abs(unpackedItems[i].w - predDims[1]) +
+                                   Math.abs(unpackedItems[i].h - predDims[2]);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            bestMatchIdx = i;
+                        }
+                    }
+                    aiSortedItems.push(unpackedItems[bestMatchIdx]);
+                    unpackedItems.splice(bestMatchIdx, 1);
+                }
+
+                items = aiSortedItems; // Chốt lại mảng hàng hóa theo ĐÚNG THỨ TỰ AI CHỈ ĐỊNH
+
+                overlay.classList.add('hidden');
+                addLog("API PyTorch phản hồi: Phân tích Self-Attention hoàn tất!", "success");
+                addLog("Bắt đầu kích hoạt cánh tay Extreme Points 6D...", "info");
+                
+                btnStep.disabled = false;
+                btnAuto.disabled = false;
+                btnAuto.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Chạy Tự Động';
+            })
+            .catch(error => {
+                overlay.classList.add('hidden');
+                addLog("LỖI API: Không kết nối được Backend Python. Hãy chạy file api.py!", "error");
+                console.error("Lỗi:", error);
+            });
+        });
+
+        // BƯỚC 2: Thuật toán Extreme Points cho 1 kiện hàng
+        function packNextItem() {
+            if (currentItemIndex >= items.length) {
+                addLog("Hoàn tất quy trình xếp hàng!", "success");
+                btnStep.disabled = true;
+                btnAuto.disabled = true;
+                isAutoPlaying = false;
+                clearInterval(autoPlayInterval);
+                return false;
+            }
+
+            const item = items[currentItemIndex];
+            addLog(`Đang xử lý Kiện #${item.id} [${item.l}x${item.w}x${item.h}]...`, "info");
+
+            let bestPoint = null;
+            let bestRot = null;
+
+            // Heuristic Mấu chốt: Sắp xếp điểm cực trị ưu tiên Thấp (Z) -> Sâu (Y) -> Trái (X)
+            validPoints.sort((a, b) => {
+                if (a[2] !== b[2]) return a[2] - b[2];
+                if (a[1] !== b[1]) return a[1] - b[1];
+                return a[0] - b[0];
+            });
+
+            // Duyệt từng điểm
+            for (let pt of validPoints) {
+                // Duyệt 6 hướng xoay
+                const rotations = getRotations(item.l, item.w, item.h);
+                for (let rot of rotations) {
+                    const [rl, rw, rh] = rot;
+                    
+                    // Giả lập gán tọa độ
+                    const testItem = { x: pt[0], y: pt[1], z: pt[2], l: rl, w: rw, h: rh };
+                    
+                    // Check Tràn Container
+                    if (testItem.x + rl > ContainerConfig.L || 
+                        testItem.y + rw > ContainerConfig.W || 
+                        testItem.z + rh > ContainerConfig.H) {
+                        continue;
+                    }
+
+                    // Check đụng độ với các kiện đã xếp
+                    let overlap = false;
+                    for (let packed of packedItems) {
+                        if (checkOverlap(testItem, packed)) {
+                            overlap = true; break;
+                        }
+                    }
+
+                    if (!overlap) {
+                        bestPoint = pt;
+                        bestRot = rot;
+                        break; // Tìm được hướng xoay tại điểm này -> chốt
+                    }
+                }
+                if (bestPoint) break; // Tìm được điểm -> chốt
+            }
+
+            if (bestPoint) {
+                // Cập nhật Item thật
+                item.x = bestPoint[0]; item.y = bestPoint[1]; item.z = bestPoint[2];
+                item.l = bestRot[0]; item.w = bestRot[1]; item.h = bestRot[2];
+                item.isPacked = true;
+                packedItems.push(item);
+
+                // Vẽ lên 3D
+                drawItemIn3D(item);
+
+                // Sinh 3 điểm cực trị mới từ kiện hàng này
+                validPoints.push([item.x + item.l, item.y, item.z]);
+                validPoints.push([item.x, item.y + item.w, item.z]);
+                validPoints.push([item.x, item.y, item.z + item.h]);
+
+                addLog(`✓ Đặt thành công tại (${item.x}, ${item.y}, ${item.z}) - Kích thước xoay: [${item.l}x${item.w}x${item.h}]`, "success");
+            } else {
+                addLog(`✗ Bỏ qua Kiện #${item.id}: Không tìm thấy khoảng trống phù hợp.`, "warning");
+            }
+
+            currentItemIndex++;
+            updateStats();
+            return true;
+        }
+
+        // Bắt sự kiện Nút Bấm
+        btnStep.addEventListener('click', packNextItem);
+
+        btnAuto.addEventListener('click', () => {
+            if (isAutoPlaying) {
+                // Pause
+                clearInterval(autoPlayInterval);
+                isAutoPlaying = false;
+                btnAuto.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Tiếp tục tự động';
+                btnStep.disabled = false;
+            } else {
+                // Play
+                isAutoPlaying = true;
+                btnStep.disabled = true;
+                btnAuto.innerHTML = '<i class="fa-solid fa-pause mr-2"></i> Tạm dừng';
+                autoPlayInterval = setInterval(() => {
+                    const hasMore = packNextItem();
+                    if (!hasMore) {
+                        clearInterval(autoPlayInterval);
+                        btnAuto.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Đã Xong';
+                    }
+                }, 100); // Tốc độ chạy: 100ms / kiện
+            }
+        });
+
+        // Khởi tạo ban đầu
+        init3DEnvironment();
+
+    </script>
+</body>
+</html>
