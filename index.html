@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,17 +14,54 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #0f172a; }
-        #canvas-container { width: 100%; height: 100vh; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-        
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+
         /* Hiệu ứng loading Transformer */
-        .ai-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .ai-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .5;
+            }
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+        }
     </style>
 </head>
+
 <body class="flex text-slate-200 font-sans">
 
     <!-- Bảng điều khiển bên trái -->
@@ -31,7 +69,7 @@
         <!-- Header -->
         <div class="p-6 border-b border-slate-700">
             <h1 class="text-xl font-bold text-blue-400 mb-1"><i class="fa-solid fa-cube mr-2"></i>CLP - Nhóm 6</h1>
-            <p class="text-xs text-slate-400">Thuật toán: Transformer Seq2Seq + Extreme Points 6D</p>
+            <p class="text-xs text-slate-400">Thuật toán: Transformer Seq2Seq + Extreme Points </p>
         </div>
 
         <!-- Thống kê -->
@@ -41,30 +79,53 @@
                 <span id="utilization-text" class="text-sm font-bold text-emerald-400">0.00%</span>
             </div>
             <div class="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-                <div id="utilization-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                <div id="utilization-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                    style="width: 0%"></div>
             </div>
             <div class="flex justify-between text-xs text-slate-400">
-                <span>Đã xếp: <strong id="packed-count" class="text-slate-200">0</strong>/<span id="total-count">0</span> kiện</span>
+                <span>Đã xếp: <strong id="packed-count" class="text-slate-200">0</strong>/<span
+                        id="total-count">0</span> kiện</span>
                 <span>Thể tích: <span id="volume-count">0</span> / <span id="container-volume">0</span></span>
             </div>
         </div>
 
         <!-- Các nút điều khiển -->
+        <div class="p-6 pb-2 border-b border-slate-700">
+            <label class="text-xs text-slate-400 uppercase font-bold mb-2 block">Chế Độ Chạy</label>
+            <select id="algo-select"
+                class="w-full bg-slate-800 text-white rounded-lg p-2.5 text-sm border border-slate-700 focus:border-blue-500 outline-none transition">
+                <option value="ai">🧠 AI Transformer + Extreme Points 6D</option>
+                <option value="greedy">📦 Tham lam (Greedy Baseline)</option>
+            </select>
+        </div>
+
         <div class="p-6 border-b border-slate-700 space-y-3">
-            <button id="btn-generate" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center">
-                <i class="fa-solid fa-rotate mr-2"></i> Sinh Dữ Liệu Mới
-            </button>
             <div class="flex space-x-2">
-                <button id="btn-step" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" disabled>
-                    <i class="fa-solid fa-shoe-prints mr-2"></i> Chạy Từng Bước
+                <button id="btn-generate"
+                    class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center">
+                    <i class="fa-solid fa-rotate mr-2"></i> Dữ Liệu Mới
                 </button>
-                <button id="btn-auto" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" disabled>
-                    <i class="fa-solid fa-play mr-2"></i> Chạy Tự Động
+                <button id="btn-reuse"
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    disabled>
+                    <i class="fa-solid fa-clock-rotate-left mr-2"></i> Chạy Lại
+                </button>
+            </div>
+            
+            <div class="flex space-x-2">
+                <button id="btn-step"
+                    class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    disabled>
+                    <i class="fa-solid fa-shoe-prints mr-2"></i> Từng Bước
+                </button>
+                <button id="btn-auto"
+                    class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    disabled>
+                    <i class="fa-solid fa-play mr-2"></i> Tự Động
                 </button>
             </div>
         </div>
 
-        <!-- Log thuật toán (Cực kỳ quan trọng để thuyết trình) -->
         <div class="p-4 bg-slate-950 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
             <h3 class="text-xs uppercase font-bold text-slate-500 mb-3 tracking-wider">Luồng Thực Thi AI</h3>
             <div id="log-container" class="space-y-2 text-xs font-mono">
@@ -72,11 +133,29 @@
             </div>
         </div>
     </div>
+    <div id="canvas-container" class="flex-1 relative cursor-move">
+        <div id="ai-overlay"
+            class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
+            <i class="fa-solid fa-microchip text-6xl text-blue-500 mb-4 ai-pulse"></i>
+            <h2 class="text-2xl font-bold text-white mb-2">Mạng Transformer đang suy luận...</h2>
+            <p class="text-slate-300">Tính toán ma trận Self-Attention & Sequence Prediction</p>
+        </div>
+    </div>
+
+    <!-- Log thuật toán (Cực kỳ quan trọng để thuyết trình) -->
+    <div class="p-4 bg-slate-950 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+        <h3 class="text-xs uppercase font-bold text-slate-500 mb-3 tracking-wider">Luồng Thực Thi AI</h3>
+        <div id="log-container" class="space-y-2 text-xs font-mono">
+            <div class="text-slate-400">Hệ thống sẵn sàng. Nhấn 'Sinh Dữ Liệu Mới' để bắt đầu.</div>
+        </div>
+    </div>
+    </div>
 
     <!-- Khu vực vẽ 3D -->
     <div id="canvas-container" class="flex-1 relative cursor-move">
         <!-- AI Processing Overlay -->
-        <div id="ai-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
+        <div id="ai-overlay"
+            class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
             <i class="fa-solid fa-microchip text-6xl text-blue-500 mb-4 ai-pulse"></i>
             <h2 class="text-2xl font-bold text-white mb-2">Mạng Transformer đang suy luận...</h2>
             <p class="text-slate-300">Tính toán ma trận Self-Attention & Sequence Prediction</p>
@@ -105,7 +184,7 @@
         let items = [];
         let packedItems = [];
         let validPoints = []; // Danh sách Extreme Points
-        
+
         // Trạng thái điều khiển
         let isAutoPlaying = false;
         let currentItemIndex = 0;
@@ -114,18 +193,18 @@
         // Hàm kiểm tra đụng độ (AABB)
         function checkOverlap(item1, item2) {
             return !(item1.x + item1.l <= item2.x ||
-                     item1.x >= item2.x + item2.l ||
-                     item1.y + item1.w <= item2.y ||
-                     item1.y >= item2.y + item2.w ||
-                     item1.z + item1.h <= item2.z ||
-                     item1.z >= item2.z + item2.h);
+                item1.x >= item2.x + item2.l ||
+                item1.y + item1.w <= item2.y ||
+                item1.y >= item2.y + item2.w ||
+                item1.z + item1.h <= item2.z ||
+                item1.z >= item2.z + item2.h);
         }
 
         // Sinh 6 hướng xoay
         function getRotations(l, w, h) {
             const rots = [
-                [l, w, h], [l, h, w], 
-                [w, l, h], [w, h, l], 
+                [l, w, h], [l, h, w],
+                [w, l, h], [w, h, l],
                 [h, l, w], [h, w, l]
             ];
             // Lọc trùng lặp bằng Stringify
@@ -158,7 +237,7 @@
         containerDiv.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.target.set(ContainerConfig.L/2, ContainerConfig.H/2, ContainerConfig.W/2);
+        controls.target.set(ContainerConfig.L / 2, ContainerConfig.H / 2, ContainerConfig.W / 2);
         controls.update();
 
         // Ánh sáng
@@ -177,36 +256,59 @@
         let containerMesh;
 
         function init3DEnvironment() {
-            // Xóa các khối cũ
-            while(scene.children.length > 0){ 
-                scene.remove(scene.children[0]); 
-            }
+            // 1. DỌN DẸP BỘ NHỚ GPU (Cực kỳ quan trọng để không sập WebGL)
+            const objectsToRemove = [];
+            scene.children.forEach(child => {
+                // Giữ lại Ánh sáng và Lưới sàn
+                if (child !== ambientLight && child !== dirLight && child !== gridHelper) {
+                    objectsToRemove.push(child);
+                }
+            });
+
+            objectsToRemove.forEach(obj => {
+                scene.remove(obj); // Xóa khỏi màn hình
+
+                // Giải phóng bộ nhớ RAM của khối hộp
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) obj.material.dispose();
+
+                // Giải phóng bộ nhớ RAM của các viền đen
+                if (obj.children && obj.children.length > 0) {
+                    obj.children.forEach(sub => {
+                        if (sub.geometry) sub.geometry.dispose();
+                        if (sub.material) sub.material.dispose();
+                    });
+                }
+            });
+
+            // 2. Đảm bảo ánh sáng và lưới luôn tồn tại
             scene.add(ambientLight);
             scene.add(dirLight);
             scene.add(gridHelper);
 
-            // Vẽ khung Container (Wireframe)
-            // LƯU Ý HỆ TỌA ĐỘ THREE.JS: X (ngang), Y (cao), Z (sâu). 
-            // Thuật toán của ta: L (ngang), H (cao), W (sâu). Nên map Z của ta -> Y của Three, Y của ta -> Z của Three.
+            // 3. Vẽ lại khung Container
             const geo = new THREE.BoxGeometry(ContainerConfig.L, ContainerConfig.H, ContainerConfig.W);
             const edges = new THREE.EdgesGeometry(geo);
             containerMesh = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x38bdf8, opacity: 0.5, transparent: true }));
-            // Đưa gốc tọa độ về góc thay vì tâm
-            containerMesh.position.set(ContainerConfig.L/2, ContainerConfig.H/2, ContainerConfig.W/2);
+            containerMesh.position.set(ContainerConfig.L / 2, ContainerConfig.H / 2, ContainerConfig.W / 2);
             scene.add(containerMesh);
+
+            camera.position.set(30, 25, 40);
+            controls.target.set(ContainerConfig.L / 2, ContainerConfig.H / 2, ContainerConfig.W / 2);
+            controls.update();
         }
 
         function drawItemIn3D(item) {
             const geo = new THREE.BoxGeometry(item.l, item.h, item.w); // Map: Algo H -> Three Y
-            
+
             // Chất liệu màu sắc
-            const mat = new THREE.MeshLambertMaterial({ 
-                color: item.color, 
+            const mat = new THREE.MeshLambertMaterial({
+                color: item.color,
                 transparent: true,
                 opacity: 0.85
             });
             const mesh = new THREE.Mesh(geo, mat);
-            
+
             // Viền đen cho khối hộp
             const edges = new THREE.EdgesGeometry(geo);
             const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
@@ -217,10 +319,10 @@
             // Three X = item.x + item.l/2
             // Three Y (Cao) = item.z + item.h/2
             // Three Z (Sâu) = item.y + item.w/2
-            mesh.position.set(item.x + item.l/2, item.z + item.h/2, item.y + item.w/2);
+            mesh.position.set(item.x + item.l / 2, item.z + item.h / 2, item.y + item.w / 2);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
-            
+
             scene.add(mesh);
             item.mesh = mesh; // Lưu lại tham chiếu để xóa nếu cần
         }
@@ -250,12 +352,12 @@
 
         function addLog(msg, type = 'info') {
             const div = document.createElement('div');
-            if(type === 'success') div.className = 'text-emerald-400 font-bold';
-            else if(type === 'warning') div.className = 'text-amber-400';
-            else if(type === 'error') div.className = 'text-rose-400';
-            else if(type === 'ai') div.className = 'text-blue-400 border-l-2 border-blue-500 pl-2';
+            if (type === 'success') div.className = 'text-emerald-400 font-bold';
+            else if (type === 'warning') div.className = 'text-amber-400';
+            else if (type === 'error') div.className = 'text-rose-400';
+            else if (type === 'ai') div.className = 'text-blue-400 border-l-2 border-blue-500 pl-2';
             else div.className = 'text-slate-300';
-            
+
             div.innerHTML = `<span class="opacity-50">[${new Date().toLocaleTimeString().split(' ')[0]}]</span> ${msg}`;
             logContainer.appendChild(div);
             logContainer.scrollTop = logContainer.scrollHeight;
@@ -264,166 +366,267 @@
         function updateStats() {
             document.getElementById('total-count').innerText = items.length;
             document.getElementById('packed-count').innerText = packedItems.length;
-            
+
             const totalVol = packedItems.reduce((sum, item) => sum + item.volume, 0);
             const maxVol = ContainerConfig.L * ContainerConfig.W * ContainerConfig.H;
             const util = (totalVol / maxVol) * 100;
-            
+
             document.getElementById('volume-count').innerText = totalVol;
             document.getElementById('container-volume').innerText = maxVol;
-            
+
             document.getElementById('utilization-text').innerText = util.toFixed(2) + '%';
             document.getElementById('utilization-bar').style.width = util + '%';
         }
 
-        // BƯỚC 1: Sinh Dữ Liệu & GỌI API PYTHON 
+        // Khai báo thêm biến lưu trạng thái của thuật toán Greedy
+        let currentAlgo = 'ai';
+        let greedyState = { x: 0, y: 0, z: 0, max_h: 0 };
+        let globalRawItems = []; // BỘ NHỚ ĐỆM LƯU DỮ LIỆU GỐC
+
+            // HÀM CHUẨN BỊ MÔI TRƯỜNG (Dùng chung cho cả 2 nút)
+            function prepareAlgorithm(useOldData) {
+                currentAlgo = document.getElementById('algo-select').value;
+                items = []; packedItems = []; validPoints = [[0, 0, 0]];
+                greedyState = { x: 0, y: 0, z: 0, max_h: 0 };
+                currentItemIndex = 0;
+                isAutoPlaying = false;
+                clearInterval(autoPlayInterval);
+                logContainer.innerHTML = '';
+                init3DEnvironment();
+
+                btnStep.disabled = true;
+                btnAuto.disabled = true;
+
+                // LOGIC QUAN TRỌNG: Tạo mới hay Dùng lại?
+                if (!useOldData) {
+                    addLog(`Đang khởi tạo danh sách 60 kiện hàng ngẫu nhiên MỚI...`, "info");
+                    globalRawItems = []; // Xóa bộ nhớ đệm
+                    for (let i = 0; i < 60; i++) {
+                        let newItem = new Item(i, Math.floor(Math.random() * 4) + 2, Math.floor(Math.random() * 3) + 2, Math.floor(Math.random() * 3) + 2);
+                        globalRawItems.push({ id: newItem.id, l: newItem.l, w: newItem.w, h: newItem.h, color: newItem.color });
+                    }
+                    document.getElementById('btn-reuse').disabled = false; // Mở khóa nút Chạy Lại
+                } else {
+                    addLog(`Đang TÁI SỬ DỤNG bộ dữ liệu 60 kiện hàng cũ...`, "info");
+                }
+
+                // Phục hồi dữ liệu từ Bộ nhớ đệm (Giữ nguyên kích thước và Màu sắc)
+                for (let raw of globalRawItems) {
+                    let restoredItem = new Item(raw.id, raw.l, raw.w, raw.h);
+                    restoredItem.color = raw.color; 
+                    items.push(restoredItem);
+                }
+                updateStats();
+
+                // RẼ NHÁNH GỌI THUẬT TOÁN
+                if (currentAlgo === 'ai') {
+                    const overlay = document.getElementById('ai-overlay');
+                    overlay.classList.remove('hidden');
+                    addLog("Gửi dữ liệu qua cổng API 5000 cho PyTorch xử lý...", "ai");
+
+                    fetch('http://localhost:5000/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ items: items })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            const predictedSeq = data.predicted_sequence;
+                            let aiSortedItems = [];
+                            let unpackedItems = [...items];
+
+                            for (let predDims of predictedSeq) {
+                                if (unpackedItems.length === 0) break;
+                                let bestMatchIdx = 0;
+                                let minDiff = Infinity;
+                                for (let i = 0; i < unpackedItems.length; i++) {
+                                    let diff = Math.abs(unpackedItems[i].l - predDims[0]) + Math.abs(unpackedItems[i].w - predDims[1]) + Math.abs(unpackedItems[i].h - predDims[2]);
+                                    if (diff < minDiff) { minDiff = diff; bestMatchIdx = i; }
+                                }
+                                aiSortedItems.push(unpackedItems[bestMatchIdx]);
+                                unpackedItems.splice(bestMatchIdx, 1);
+                            }
+                            items = aiSortedItems;
+                            overlay.classList.add('hidden');
+                            addLog("API PyTorch phản hồi: Phân tích Self-Attention hoàn tất!", "success");
+                            addLog("Bắt đầu kích hoạt cánh tay Extreme Points 6D...", "info");
+
+                            btnStep.disabled = false;
+                            btnAuto.disabled = false;
+                        })
+                        .catch(error => {
+                            document.getElementById('ai-overlay').classList.add('hidden');
+                            addLog("LỖI API: Không kết nối được Backend Python.", "error");
+                        });
+                } else {
+                    addLog("Chế độ Tham lam: Sắp xếp kiện hàng theo thể tích giảm dần...", "warning");
+                    items.sort((a, b) => b.volume - a.volume);
+                    addLog("Sẵn sàng xếp hàng bằng logic Tham lam (Tịnh tiến tọa độ)!", "success");
+                    btnStep.disabled = false;
+                    btnAuto.disabled = false;
+                }
+                btnAuto.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Tự Động';
+            }
+
+            // Gắn sự kiện cho 2 nút
+            document.getElementById('btn-generate').addEventListener('click', () => prepareAlgorithm(false));
+            document.getElementById('btn-reuse').addEventListener('click', () => prepareAlgorithm(true));
+
+        // BƯỚC 1: Sinh Dữ Liệu & RẼ NHÁNH THUẬT TOÁN
         btnGen.addEventListener('click', () => {
-            items = []; packedItems = []; validPoints = [[0,0,0]];
+            currentAlgo = document.getElementById('algo-select').value; // Đọc thuật toán được chọn
+            items = []; packedItems = []; validPoints = [[0, 0, 0]];
+            greedyState = { x: 0, y: 0, z: 0, max_h: 0 }; // Reset state Tham lam
             currentItemIndex = 0;
             isAutoPlaying = false;
             clearInterval(autoPlayInterval);
             logContainer.innerHTML = '';
             init3DEnvironment();
-            
+
             btnStep.disabled = true;
             btnAuto.disabled = true;
 
-            addLog("Đang khởi tạo danh sách kiện hàng ngẫu nhiên...", "info");
-            for(let i=0; i<60; i++) {
-                items.push(new Item(i, Math.floor(Math.random()*4)+2, Math.floor(Math.random()*3)+2, Math.floor(Math.random()*3)+2));
+            addLog(`Đang khởi tạo danh sách 60 kiện hàng ngẫu nhiên...`, "info");
+            for (let i = 0; i < 60; i++) {
+                items.push(new Item(i, Math.floor(Math.random() * 4) + 2, Math.floor(Math.random() * 3) + 2, Math.floor(Math.random() * 3) + 2));
             }
             updateStats();
 
-            const overlay = document.getElementById('ai-overlay');
-            overlay.classList.remove('hidden');
-            addLog("Gửi dữ liệu qua cổng API 5000 cho PyTorch xử lý...", "ai");
-            
-            // GỌI API ĐẾN PYTHON BACKEND
-            fetch('http://localhost:5000/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: items }) // Gửi 60 kiện hàng đi
-            })
-            .then(response => response.json())
-            .then(data => {
-                const predictedSeq = data.predicted_sequence;
+            if (currentAlgo === 'ai') {
+                // LÀM THEO CÁCH AI: Gọi API Python
+                const overlay = document.getElementById('ai-overlay');
+                overlay.classList.remove('hidden');
+                addLog("Gửi dữ liệu qua cổng API 5000 cho PyTorch xử lý...", "ai");
 
-                // Bắt cặp dự đoán của AI với các kiện hàng thực tế (Giống file run_ai.py)
-                let aiSortedItems = [];
-                let unpackedItems = [...items];
+                fetch('http://localhost:5000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: items })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        const predictedSeq = data.predicted_sequence;
+                        let aiSortedItems = [];
+                        let unpackedItems = [...items];
 
-                for (let predDims of predictedSeq) {
-                    if (unpackedItems.length === 0) break;
-                    
-                    let bestMatchIdx = 0;
-                    let minDiff = Infinity;
-                    
-                    for (let i = 0; i < unpackedItems.length; i++) {
-                        let diff = Math.abs(unpackedItems[i].l - predDims[0]) +
-                                   Math.abs(unpackedItems[i].w - predDims[1]) +
-                                   Math.abs(unpackedItems[i].h - predDims[2]);
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            bestMatchIdx = i;
+                        for (let predDims of predictedSeq) {
+                            if (unpackedItems.length === 0) break;
+                            let bestMatchIdx = 0;
+                            let minDiff = Infinity;
+                            for (let i = 0; i < unpackedItems.length; i++) {
+                                let diff = Math.abs(unpackedItems[i].l - predDims[0]) + Math.abs(unpackedItems[i].w - predDims[1]) + Math.abs(unpackedItems[i].h - predDims[2]);
+                                if (diff < minDiff) { minDiff = diff; bestMatchIdx = i; }
+                            }
+                            aiSortedItems.push(unpackedItems[bestMatchIdx]);
+                            unpackedItems.splice(bestMatchIdx, 1);
                         }
-                    }
-                    aiSortedItems.push(unpackedItems[bestMatchIdx]);
-                    unpackedItems.splice(bestMatchIdx, 1);
-                }
+                        items = aiSortedItems;
+                        overlay.classList.add('hidden');
+                        addLog("API PyTorch phản hồi: Phân tích Self-Attention hoàn tất!", "success");
+                        addLog("Bắt đầu kích hoạt cánh tay Extreme Points 6D...", "info");
 
-                items = aiSortedItems; // Chốt lại mảng hàng hóa theo ĐÚNG THỨ TỰ AI CHỈ ĐỊNH
-
-                overlay.classList.add('hidden');
-                addLog("API PyTorch phản hồi: Phân tích Self-Attention hoàn tất!", "success");
-                addLog("Bắt đầu kích hoạt cánh tay Extreme Points 6D...", "info");
-                
+                        btnStep.disabled = false;
+                        btnAuto.disabled = false;
+                    })
+                    .catch(error => {
+                        document.getElementById('ai-overlay').classList.add('hidden');
+                        addLog("LỖI API: Không kết nối được Backend Python.", "error");
+                    });
+            } else {
+                // LÀM THEO CÁCH THAM LAM (Greedy Baseline)
+                addLog("Chế độ Tham lam: Sắp xếp kiện hàng theo thể tích giảm dần...", "warning");
+                items.sort((a, b) => b.volume - a.volume); // Heuristic của Greedy
+                addLog("Sẵn sàng xếp hàng bằng logic Tham lam (Tịnh tiến tọa độ)!", "success");
                 btnStep.disabled = false;
                 btnAuto.disabled = false;
-                btnAuto.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Chạy Tự Động';
-            })
-            .catch(error => {
-                overlay.classList.add('hidden');
-                addLog("LỖI API: Không kết nối được Backend Python. Hãy chạy file api.py!", "error");
-                console.error("Lỗi:", error);
-            });
+            }
+            btnAuto.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Chạy Tự Động';
         });
+        
 
-        // BƯỚC 2: Thuật toán Extreme Points cho 1 kiện hàng
+        // BƯỚC 2: Thuật toán xếp hàng cho 1 kiện
         function packNextItem() {
             if (currentItemIndex >= items.length) {
-                addLog("Hoàn tất quy trình xếp hàng!", "success");
-                btnStep.disabled = true;
-                btnAuto.disabled = true;
-                isAutoPlaying = false;
-                clearInterval(autoPlayInterval);
+                addLog(`Hoàn tất quy trình xếp hàng bằng thuật toán ${currentAlgo.toUpperCase()}!`, "success");
+                btnStep.disabled = true; btnAuto.disabled = true; isAutoPlaying = false; clearInterval(autoPlayInterval);
                 return false;
             }
 
             const item = items[currentItemIndex];
             addLog(`Đang xử lý Kiện #${item.id} [${item.l}x${item.w}x${item.h}]...`, "info");
 
-            let bestPoint = null;
-            let bestRot = null;
+            if (currentAlgo === 'ai') {
+                // ==========================================
+                // LUỒNG 1: THUẬT TOÁN EXTREME POINTS 6D (CỦA AI)
+                // ==========================================
+                let bestPoint = null; let bestRot = null;
+                validPoints.sort((a, b) => {
+                    if (a[2] !== b[2]) return a[2] - b[2];
+                    if (a[1] !== b[1]) return a[1] - b[1];
+                    return a[0] - b[0];
+                });
 
-            // Heuristic Mấu chốt: Sắp xếp điểm cực trị ưu tiên Thấp (Z) -> Sâu (Y) -> Trái (X)
-            validPoints.sort((a, b) => {
-                if (a[2] !== b[2]) return a[2] - b[2];
-                if (a[1] !== b[1]) return a[1] - b[1];
-                return a[0] - b[0];
-            });
+                for (let pt of validPoints) {
+                    const rotations = getRotations(item.l, item.w, item.h);
+                    for (let rot of rotations) {
+                        const [rl, rw, rh] = rot;
+                        const testItem = { x: pt[0], y: pt[1], z: pt[2], l: rl, w: rw, h: rh };
 
-            // Duyệt từng điểm
-            for (let pt of validPoints) {
-                // Duyệt 6 hướng xoay
-                const rotations = getRotations(item.l, item.w, item.h);
-                for (let rot of rotations) {
-                    const [rl, rw, rh] = rot;
-                    
-                    // Giả lập gán tọa độ
-                    const testItem = { x: pt[0], y: pt[1], z: pt[2], l: rl, w: rw, h: rh };
-                    
-                    // Check Tràn Container
-                    if (testItem.x + rl > ContainerConfig.L || 
-                        testItem.y + rw > ContainerConfig.W || 
-                        testItem.z + rh > ContainerConfig.H) {
-                        continue;
-                    }
+                        if (testItem.x + rl > ContainerConfig.L || testItem.y + rw > ContainerConfig.W || testItem.z + rh > ContainerConfig.H) continue;
 
-                    // Check đụng độ với các kiện đã xếp
-                    let overlap = false;
-                    for (let packed of packedItems) {
-                        if (checkOverlap(testItem, packed)) {
-                            overlap = true; break;
+                        let overlap = false;
+                        for (let packed of packedItems) {
+                            if (checkOverlap(testItem, packed)) { overlap = true; break; }
                         }
+                        if (!overlap) { bestPoint = pt; bestRot = rot; break; }
                     }
-
-                    if (!overlap) {
-                        bestPoint = pt;
-                        bestRot = rot;
-                        break; // Tìm được hướng xoay tại điểm này -> chốt
-                    }
+                    if (bestPoint) break;
                 }
-                if (bestPoint) break; // Tìm được điểm -> chốt
-            }
 
-            if (bestPoint) {
-                // Cập nhật Item thật
-                item.x = bestPoint[0]; item.y = bestPoint[1]; item.z = bestPoint[2];
-                item.l = bestRot[0]; item.w = bestRot[1]; item.h = bestRot[2];
-                item.isPacked = true;
-                packedItems.push(item);
-
-                // Vẽ lên 3D
-                drawItemIn3D(item);
-
-                // Sinh 3 điểm cực trị mới từ kiện hàng này
-                validPoints.push([item.x + item.l, item.y, item.z]);
-                validPoints.push([item.x, item.y + item.w, item.z]);
-                validPoints.push([item.x, item.y, item.z + item.h]);
-
-                addLog(`✓ Đặt thành công tại (${item.x}, ${item.y}, ${item.z}) - Kích thước xoay: [${item.l}x${item.w}x${item.h}]`, "success");
+                if (bestPoint) {
+                    item.x = bestPoint[0]; item.y = bestPoint[1]; item.z = bestPoint[2];
+                    item.l = bestRot[0]; item.w = bestRot[1]; item.h = bestRot[2];
+                    item.isPacked = true;
+                    packedItems.push(item);
+                    drawItemIn3D(item);
+                    validPoints.push([item.x + item.l, item.y, item.z]);
+                    validPoints.push([item.x, item.y + item.w, item.z]);
+                    validPoints.push([item.x, item.y, item.z + item.h]);
+                    addLog(`✓ Đặt thành công tại (${item.x}, ${item.y}, ${item.z})`, "success");
+                } else {
+                    addLog(`✗ Bỏ qua Kiện #${item.id}: Không tìm thấy khoảng trống phù hợp.`, "error");
+                }
             } else {
-                addLog(`✗ Bỏ qua Kiện #${item.id}: Không tìm thấy khoảng trống phù hợp.`, "warning");
+                // ==========================================
+                // LUỒNG 2: THUẬT TOÁN THAM LAM - GREEDY BASELINE
+                // ==========================================
+                // Logic tịnh tiến mù quáng y hệt như file algorithms.py
+                if (greedyState.x + item.l > ContainerConfig.L) {
+                    greedyState.x = 0;
+                    greedyState.y += item.w;
+                }
+                if (greedyState.y + item.w > ContainerConfig.W) {
+                    greedyState.x = 0;
+                    greedyState.y = 0;
+                    greedyState.z += greedyState.max_h;
+                    greedyState.max_h = 0;
+                }
+
+                if (greedyState.z + item.h <= ContainerConfig.H) {
+                    item.x = greedyState.x;
+                    item.y = greedyState.y;
+                    item.z = greedyState.z;
+
+                    greedyState.x += item.l;
+                    greedyState.max_h = Math.max(greedyState.max_h, item.h);
+
+                    item.isPacked = true;
+                    packedItems.push(item);
+                    drawItemIn3D(item);
+                    addLog(`✓ [Greedy] Đặt tại (${item.x}, ${item.y}, ${item.z})`, "warning");
+                } else {
+                    addLog(`✗ Bỏ qua Kiện #${item.id}: Đã đụng trần container.`, "error");
+                }
             }
 
             currentItemIndex++;
@@ -461,4 +664,5 @@
 
     </script>
 </body>
+
 </html>
