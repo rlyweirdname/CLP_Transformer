@@ -134,6 +134,9 @@
                 <div id="utilization-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
                     style="width: 0%"></div>
             </div>
+            <div id="utilization-compare-text" class="text-xs text-slate-400 mb-3">
+                So sánh lần chạy: Chưa có dữ liệu.
+            </div>
             <div class="flex justify-between text-xs text-slate-400">
                 <span>Đã xếp: <strong id="packed-count" class="text-slate-200">0</strong>/<span
                         id="total-count">0</span> kiện</span>
@@ -381,6 +384,7 @@
         // ==========================================
         const logContainer = document.getElementById('log-container');
         const btnGen = document.getElementById('btn-generate');
+        const btnReuse = document.getElementById('btn-reuse');
         const btnStep = document.getElementById('btn-step');
         const btnAuto = document.getElementById('btn-auto');
         const controlPanel = document.getElementById('control-panel');
@@ -455,10 +459,47 @@
             document.getElementById('utilization-bar').style.width = util + '%';
         }
 
+        function getResultSummaryText() {
+            const packed = packedItems.length;
+            const total = items.length;
+            const totalVol = packedItems.reduce((sum, item) => sum + item.volume, 0);
+            const maxVol = ContainerConfig.L * ContainerConfig.W * ContainerConfig.H;
+            const util = ((totalVol / maxVol) * 100).toFixed(2);
+            return `Kết quả cuối: ${packed}/${total} kiện, lấp đầy ${util}%`;
+        }
+
+        function buildCurrentRunResult() {
+            const packed = packedItems.length;
+            const total = items.length;
+            const totalVol = packedItems.reduce((sum, item) => sum + item.volume, 0);
+            const maxVol = ContainerConfig.L * ContainerConfig.W * ContainerConfig.H;
+            return {
+                mode: currentAlgo,
+                packed,
+                total,
+                utilization: (totalVol / maxVol) * 100,
+            };
+        }
+
+        function formatComparison(prev, curr) {
+            const deltaPacked = curr.packed - prev.packed;
+            const deltaUtil = curr.utilization - prev.utilization;
+            const packedSign = deltaPacked >= 0 ? '+' : '';
+            const utilSign = deltaUtil >= 0 ? '+' : '';
+            return `So với ${prev.mode.toUpperCase()}: kiện ${packedSign}${deltaPacked}, lấp đầy ${utilSign}${deltaUtil.toFixed(2)}%`;
+        }
+
+        function setUtilizationComparisonText(text) {
+            const line = document.getElementById('utilization-compare-text');
+            line.innerText = text;
+        }
+
         // Khai báo thêm biến lưu trạng thái của thuật toán Greedy
         let currentAlgo = 'ai';
         let greedyState = { x: 0, y: 0, z: 0, row_max_w: 0, layer_max_h: 0 };
         let globalRawItems = []; // BỘ NHỚ ĐỆM LƯU DỮ LIỆU GỐC
+        let lastRunResult = null;
+        let lastResultByMode = { ai: null, greedy: null };
 
             // HÀM CHUẨN BỊ MÔI TRƯỜNG (Dùng chung cho cả 2 nút)
             function prepareAlgorithm(useOldData) {
@@ -547,85 +588,34 @@
             }
 
             // Gắn sự kiện cho 2 nút
-            document.getElementById('btn-generate').addEventListener('click', () => prepareAlgorithm(false));
-            document.getElementById('btn-reuse').addEventListener('click', () => prepareAlgorithm(true));
-
-        // BƯỚC 1: Sinh Dữ Liệu & RẼ NHÁNH THUẬT TOÁN
-        btnGen.addEventListener('click', () => {
-            currentAlgo = document.getElementById('algo-select').value; // Đọc thuật toán được chọn
-            items = []; packedItems = []; validPoints = [[0, 0, 0]];
-            greedyState = { x: 0, y: 0, z: 0, row_max_w: 0, layer_max_h: 0 }; // Reset state Tham lam
-            currentItemIndex = 0;
-            isAutoPlaying = false;
-            clearInterval(autoPlayInterval);
-            logContainer.innerHTML = '';
-            init3DEnvironment();
-
-            btnStep.disabled = true;
-            btnAuto.disabled = true;
-
-            addLog(`Đang khởi tạo danh sách 60 kiện hàng ngẫu nhiên...`, "info");
-            for (let i = 0; i < 60; i++) {
-                items.push(new Item(i, Math.floor(Math.random() * 4) + 2, Math.floor(Math.random() * 3) + 2, Math.floor(Math.random() * 3) + 2));
-            }
-            updateStats();
-
-            if (currentAlgo === 'ai') {
-                // LÀM THEO CÁCH AI: Gọi API Python
-                const overlay = document.getElementById('ai-overlay');
-                overlay.classList.remove('hidden');
-                addLog("Gửi dữ liệu qua endpoint /predict cho PyTorch xử lý...", "ai");
-
-                fetch('/predict', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: items })
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        const predictedSeq = data.predicted_sequence;
-                        let aiSortedItems = [];
-                        let unpackedItems = [...items];
-
-                        for (let predDims of predictedSeq) {
-                            if (unpackedItems.length === 0) break;
-                            let bestMatchIdx = 0;
-                            let minDiff = Infinity;
-                            for (let i = 0; i < unpackedItems.length; i++) {
-                                let diff = Math.abs(unpackedItems[i].l - predDims[0]) + Math.abs(unpackedItems[i].w - predDims[1]) + Math.abs(unpackedItems[i].h - predDims[2]);
-                                if (diff < minDiff) { minDiff = diff; bestMatchIdx = i; }
-                            }
-                            aiSortedItems.push(unpackedItems[bestMatchIdx]);
-                            unpackedItems.splice(bestMatchIdx, 1);
-                        }
-                        items = aiSortedItems;
-                        overlay.classList.add('hidden');
-                        addLog("API PyTorch phản hồi: Phân tích Self-Attention hoàn tất!", "success");
-                        addLog("Bắt đầu kích hoạt cánh tay Extreme Points 6D...", "info");
-
-                        btnStep.disabled = false;
-                        btnAuto.disabled = false;
-                    })
-                    .catch(error => {
-                        document.getElementById('ai-overlay').classList.add('hidden');
-                        addLog("LỖI API: Không kết nối được Backend Python.", "error");
-                    });
-            } else {
-                // LÀM THEO CÁCH THAM LAM (Greedy Baseline)
-                addLog("Chế độ Tham lam: Sắp xếp kiện hàng theo thể tích giảm dần...", "warning");
-                items.sort((a, b) => b.volume - a.volume); // Heuristic của Greedy
-                addLog("Sẵn sàng xếp hàng bằng logic Tham lam (Tịnh tiến tọa độ)!", "success");
-                btnStep.disabled = false;
-                btnAuto.disabled = false;
-            }
-            btnAuto.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Chạy Tự Động';
-        });
+            btnGen.addEventListener('click', () => prepareAlgorithm(false));
+            btnReuse.addEventListener('click', () => prepareAlgorithm(true));
         
 
         // BƯỚC 2: Thuật toán xếp hàng cho 1 kiện
         function packNextItem() {
             if (currentItemIndex >= items.length) {
                 addLog(`Hoàn tất quy trình xếp hàng bằng thuật toán ${currentAlgo.toUpperCase()}!`, "success");
+                addLog(getResultSummaryText(), "ai");
+
+                const currentResult = buildCurrentRunResult();
+                if (lastRunResult) {
+                    const compareText = formatComparison(lastRunResult, currentResult);
+                    addLog(compareText, "warning");
+                    setUtilizationComparisonText(compareText);
+                }
+
+                const otherMode = currentAlgo === 'ai' ? 'greedy' : 'ai';
+                const otherModeResult = lastResultByMode[otherMode];
+                if (otherModeResult && (!lastRunResult || otherModeResult !== lastRunResult)) {
+                    const crossModeText = formatComparison(otherModeResult, currentResult);
+                    addLog(crossModeText, "warning");
+                    if (!lastRunResult) setUtilizationComparisonText(crossModeText);
+                }
+
+                lastRunResult = currentResult;
+                lastResultByMode[currentAlgo] = currentResult;
+
                 btnStep.disabled = true; btnAuto.disabled = true; isAutoPlaying = false; clearInterval(autoPlayInterval);
                 return false;
             }
