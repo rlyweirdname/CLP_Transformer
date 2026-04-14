@@ -519,6 +519,9 @@
                 // LOGIC QUAN TRỌNG: Tạo mới hay Dùng lại?
                 if (!useOldData) {
                     addLog(`Đang khởi tạo danh sách 60 kiện hàng ngẫu nhiên MỚI...`, "info");
+                    setUtilizationComparisonText("So sánh lần chạy: Chưa có dữ liệu.");
+                    lastRunResult = null;
+                    lastResultByMode = { ai: null, greedy: null };
                     globalRawItems = []; // Xóa bộ nhớ đệm
                     for (let i = 0; i < 60; i++) {
                         let newItem = new Item(i, Math.floor(Math.random() * 4) + 2, Math.floor(Math.random() * 3) + 2, Math.floor(Math.random() * 3) + 2);
