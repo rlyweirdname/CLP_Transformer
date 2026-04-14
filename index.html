@@ -16,13 +16,58 @@
     <style>
         body {
             margin: 0;
-            overflow: hidden;
             background-color: #0f172a;
+            min-height: 100vh;
+            overflow: hidden;
         }
 
         #canvas-container {
             width: 100%;
             height: 100vh;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                overflow: auto;
+            }
+
+            #canvas-container {
+                height: 100vh;
+                min-height: 100vh;
+            }
+
+            #control-panel {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: min(24rem, 88vw);
+                height: 100vh;
+                transform: translateX(-100%);
+                transition: transform 240ms ease;
+                z-index: 40;
+                border-right: 1px solid #334155;
+                border-bottom: 0;
+            }
+
+            #control-panel.mobile-open {
+                transform: translateX(0);
+            }
+
+            #mobile-panel-backdrop {
+                position: fixed;
+                inset: 0;
+                background: rgba(2, 6, 23, 0.68);
+                backdrop-filter: blur(2px);
+                z-index: 30;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 200ms ease;
+            }
+
+            #mobile-panel-backdrop.show {
+                opacity: 1;
+                pointer-events: auto;
+            }
         }
 
         .custom-scrollbar::-webkit-scrollbar {
@@ -62,10 +107,17 @@
     </style>
 </head>
 
-<body class="flex text-slate-200 font-sans">
+<body class="min-h-screen flex flex-col md:flex-row text-slate-200 font-sans">
+    <button id="mobile-panel-toggle"
+        aria-expanded="false"
+        class="md:hidden fixed top-3 left-3 z-50 bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm font-semibold shadow-lg">
+        <i class="fa-solid fa-sliders mr-2"></i>Bảng điều khiển
+    </button>
+    <div id="mobile-panel-backdrop" class="md:hidden"></div>
 
     <!-- Bảng điều khiển bên trái -->
-    <div class="w-96 bg-slate-900 border-r border-slate-700 h-screen flex flex-col z-10 shadow-2xl relative">
+    <div id="control-panel"
+        class="w-full md:w-96 md:min-w-96 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-700 h-[45vh] md:h-screen flex flex-col z-10 shadow-2xl relative">
         <!-- Header -->
         <div class="p-6 border-b border-slate-700">
             <h1 class="text-xl font-bold text-blue-400 mb-1"><i class="fa-solid fa-cube mr-2"></i>CLP - Nhóm 6</h1>
@@ -133,27 +185,7 @@
             </div>
         </div>
     </div>
-    <div id="canvas-container" class="flex-1 relative cursor-move">
-        <div id="ai-overlay"
-            class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
-            <i class="fa-solid fa-microchip text-6xl text-blue-500 mb-4 ai-pulse"></i>
-            <h2 class="text-2xl font-bold text-white mb-2">Mạng Transformer đang suy luận...</h2>
-            <p class="text-slate-300">Tính toán ma trận Self-Attention & Sequence Prediction</p>
-        </div>
-    </div>
-
-    <!-- Log thuật toán (Cực kỳ quan trọng để thuyết trình) -->
-    <div class="p-4 bg-slate-950 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-        <h3 class="text-xs uppercase font-bold text-slate-500 mb-3 tracking-wider">Luồng Thực Thi AI</h3>
-        <div id="log-container" class="space-y-2 text-xs font-mono">
-            <div class="text-slate-400">Hệ thống sẵn sàng. Nhấn 'Sinh Dữ Liệu Mới' để bắt đầu.</div>
-        </div>
-    </div>
-    </div>
-
-    <!-- Khu vực vẽ 3D -->
-    <div id="canvas-container" class="flex-1 relative cursor-move">
-        <!-- AI Processing Overlay -->
+    <div id="canvas-container" class="flex-1 relative cursor-move min-h-[55vh] md:min-h-screen">
         <div id="ai-overlay"
             class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
             <i class="fa-solid fa-microchip text-6xl text-blue-500 mb-4 ai-pulse"></i>
@@ -228,13 +260,22 @@
         scene.background = new THREE.Color(0x0f172a); // Khớp màu nền Tailwind slate-900
 
         // Camera hướng chéo từ trên xuống
-        const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 384) / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
         camera.position.set(30, 25, 40);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth - 384, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.shadowMap.enabled = true;
         containerDiv.appendChild(renderer.domElement);
+
+        function resizeRenderer() {
+            const width = Math.max(containerDiv.clientWidth, 1);
+            const height = Math.max(containerDiv.clientHeight, 1);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+        resizeRenderer();
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.target.set(ContainerConfig.L / 2, ContainerConfig.H / 2, ContainerConfig.W / 2);
@@ -335,13 +376,6 @@
         }
         animate();
 
-        // Xử lý Resize
-        window.addEventListener('resize', () => {
-            camera.aspect = (window.innerWidth - 384) / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth - 384, window.innerHeight);
-        });
-
         // ==========================================
         // 3. LOGIC GIAO DIỆN & TRÌNH DIỄN THUẬT TOÁN
         // ==========================================
@@ -349,6 +383,49 @@
         const btnGen = document.getElementById('btn-generate');
         const btnStep = document.getElementById('btn-step');
         const btnAuto = document.getElementById('btn-auto');
+        const controlPanel = document.getElementById('control-panel');
+        const mobilePanelToggle = document.getElementById('mobile-panel-toggle');
+        const mobilePanelBackdrop = document.getElementById('mobile-panel-backdrop');
+
+        function isMobileView() {
+            return window.matchMedia('(max-width: 768px)').matches;
+        }
+
+        function setMobilePanelOpen(open) {
+            if (!isMobileView()) return;
+
+            controlPanel.classList.toggle('mobile-open', open);
+            mobilePanelBackdrop.classList.toggle('show', open);
+            document.body.style.overflow = open ? 'hidden' : '';
+            mobilePanelToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            mobilePanelToggle.innerHTML = open
+                ? '<i class="fa-solid fa-xmark mr-2"></i>Đóng'
+                : '<i class="fa-solid fa-sliders mr-2"></i>Bảng điều khiển';
+
+            setTimeout(() => resizeRenderer(), 250);
+        }
+
+        function closeMobilePanel() {
+            if (isMobileView()) setMobilePanelOpen(false);
+        }
+
+        mobilePanelToggle.addEventListener('click', () => {
+            const isOpen = controlPanel.classList.contains('mobile-open');
+            setMobilePanelOpen(!isOpen);
+        });
+        mobilePanelBackdrop.addEventListener('click', closeMobilePanel);
+
+        // Xử lý Resize
+        window.addEventListener('resize', () => {
+            resizeRenderer();
+            if (!isMobileView()) {
+                controlPanel.classList.remove('mobile-open');
+                mobilePanelBackdrop.classList.remove('show');
+                mobilePanelToggle.innerHTML = '<i class="fa-solid fa-sliders mr-2"></i>Bảng điều khiển';
+                mobilePanelToggle.setAttribute('aria-expanded', 'false');
+                document.body.style.overflow = '';
+            }
+        });
 
         function addLog(msg, type = 'info') {
             const div = document.createElement('div');
@@ -385,6 +462,7 @@
 
             // HÀM CHUẨN BỊ MÔI TRƯỜNG (Dùng chung cho cả 2 nút)
             function prepareAlgorithm(useOldData) {
+                closeMobilePanel();
                 currentAlgo = document.getElementById('algo-select').value;
                 items = []; packedItems = []; validPoints = [[0, 0, 0]];
                 greedyState = { x: 0, y: 0, z: 0, row_max_w: 0, layer_max_h: 0};
@@ -422,9 +500,9 @@
                 if (currentAlgo === 'ai') {
                     const overlay = document.getElementById('ai-overlay');
                     overlay.classList.remove('hidden');
-                    addLog("Gửi dữ liệu qua cổng API 5000 cho PyTorch xử lý...", "ai");
+                    addLog("Gửi dữ liệu qua endpoint /predict cho PyTorch xử lý...", "ai");
 
-                    fetch('http://localhost:5000/predict', {
+                    fetch('/predict', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ items: items })
@@ -496,9 +574,9 @@
                 // LÀM THEO CÁCH AI: Gọi API Python
                 const overlay = document.getElementById('ai-overlay');
                 overlay.classList.remove('hidden');
-                addLog("Gửi dữ liệu qua cổng API 5000 cho PyTorch xử lý...", "ai");
+                addLog("Gửi dữ liệu qua endpoint /predict cho PyTorch xử lý...", "ai");
 
-                fetch('http://localhost:5000/predict', {
+                fetch('/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ items: items })
@@ -646,8 +724,10 @@
 
         // Bắt sự kiện Nút Bấm
         btnStep.addEventListener('click', packNextItem);
+        btnStep.addEventListener('click', closeMobilePanel);
 
         btnAuto.addEventListener('click', () => {
+            closeMobilePanel();
             if (isAutoPlaying) {
                 // Pause
                 clearInterval(autoPlayInterval);

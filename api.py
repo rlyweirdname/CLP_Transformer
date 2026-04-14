@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import torch
 from model import Seq2SeqCLP
@@ -6,6 +6,14 @@ from environment import Item
 
 app = Flask(__name__)
 CORS(app) # Cho phép file HTML gọi API mà không bị chặn lỗi CORS
+
+@app.route('/', methods=['GET'])
+def home():
+    return send_from_directory('.', 'index.html')
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"})
 
 # 1. Tải mô hình AI lên bộ nhớ (chỉ tải 1 lần khi bật server)
 print("Đang khởi động Server và tải mô hình Transformer...")
@@ -51,5 +59,5 @@ def predict():
     return jsonify({"predicted_sequence": predicted_seq})
 
 if __name__ == '__main__':
-    # Chạy server ở port 5000
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Chạy server ở port 5001
+    app.run(host='0.0.0.0', port=5001, debug=True)
