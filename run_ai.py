@@ -4,6 +4,64 @@ from environment import Item, Container
 from visualization import draw_3d_container
 from model import Seq2SeqCLP
 
+def extract_state_dict(raw_checkpoint):
+    if isinstance(raw_checkpoint, dict) and "state_dict" in raw_checkpoint:
+        return raw_checkpoint["state_dict"]
+    return raw_checkpoint
+
+def infer_hidden_dim(state_dict, default_dim=128):
+    emb_weight = state_dict.get("embedding.weight")
+    if emb_weight is not None and hasattr(emb_weight, "shape") and len(emb_weight.shape) == 2:
+        return int(emb_weight.shape[0])
+    return default_dim
+
+def infer_n_layers(state_dict, default_n_layers=3):
+    layer_indices = set()
+    for key in state_dict.keys():
+        parts = key.split(".")
+        if "layers" in parts:
+            idx = parts.index("layers")
+            if idx + 1 < len(parts) and parts[idx + 1].isdigit():
+                layer_indices.add(int(parts[idx + 1]))
+    return max(layer_indices) + 1 if layer_indices else default_n_layers
+
+
+def beam_match_items_to_predictions(items, predicted_seq, beam_width=4):
+    """Ghép item theo chuỗi dự đoán bằng Beam Search để giảm sai số tích lũy."""
+    if not items or len(predicted_seq) == 0:
+        return items.copy()
+
+    beams = [{"score": 0.0, "order": [], "used": frozenset()}]
+
+    for pred_dims in predicted_seq:
+        next_beams = []
+        for beam in beams:
+            for idx, it in enumerate(items):
+                if idx in beam["used"]:
+                    continue
+                diff = abs(it.l - pred_dims[0]) + abs(it.w - pred_dims[1]) + abs(it.h - pred_dims[2])
+                next_beams.append({
+                    "score": beam["score"] + diff,
+                    "order": beam["order"] + [idx],
+                    "used": beam["used"] | {idx}
+                })
+
+        if len(next_beams) == 0:
+            break
+        next_beams.sort(key=lambda x: x["score"])
+        beams = next_beams[:beam_width]
+
+    if len(beams) == 0:
+        return items.copy()
+
+    best = beams[0]
+    ordered = [items[idx] for idx in best["order"]]
+    for idx, it in enumerate(items):
+        if idx not in best["used"]:
+            ordered.append(it)
+    return ordered
+
+
 def get_ai_prediction(model, items):
     """Sử dụng Transformer để dự đoán TỪNG BƯỚC MỘT (Autoregressive)."""
     model.eval() 
@@ -52,16 +110,7 @@ def get_rotations(l, w, h):
 
 def ai_pack(container, items, predicted_seq):
     """Xếp hàng thông minh: Kết hợp Extreme Points + Xoay 6 hướng."""
-    items_to_pack = []
-    unpacked_items = items.copy()
-    
-    # 1. Bắt cặp kiện hàng thực tế với dự đoán của Transformer
-    for pred_dims in predicted_seq:
-        if len(unpacked_items) == 0:
-            break
-        best_match = min(unpacked_items, key=lambda i: abs(i.l - pred_dims[0]) + abs(i.w - pred_dims[1]) + abs(i.h - pred_dims[2]))
-        items_to_pack.append(best_match)
-        unpacked_items.remove(best_match)
+    items_to_pack = beam_match_items_to_predictions(items, predicted_seq, beam_width=4)
         
     # 2. Danh sách các tọa độ điểm cực trị (Bắt đầu từ gốc 0,0,0)
     valid_points = [(0, 0, 0)]
@@ -106,6 +155,7 @@ def ai_pack(container, items, predicted_seq):
                 
         # 3. Chốt hạ việc đặt kiện hàng
         if best_point:
+            assert best_rotation is not None
             item.l, item.w, item.h = best_rotation
             item.is_packed = True
             container.add_item(item)
@@ -124,12 +174,20 @@ def main():
         items.append(Item(id=i, l=random.randint(2, 5), w=random.randint(2, 4), h=random.randint(2, 4)))
         
     print("Đang tải mô hình Transformer đã huấn luyện...")
-    model = Seq2SeqCLP()
     try:
-        model.load_state_dict(torch.load("clp_transformer.pth"))
-        print("Tải mô hình thành công!")
+        raw_checkpoint = torch.load("clp_transformer.pth", map_location="cpu")
+        state_dict = extract_state_dict(raw_checkpoint)
+        hidden_dim = infer_hidden_dim(state_dict, default_dim=128)
+        n_layers = 3
+        model = Seq2SeqCLP(hidden_dim=hidden_dim, n_layers=n_layers)
+        model.load_state_dict(state_dict)
+        print(f"Tải mô hình thành công! hidden_dim={hidden_dim}, n_layers={n_layers}")
     except FileNotFoundError:
         print("Lỗi: Không tìm thấy file clp_transformer.pth. Hãy chạy train.py trước.")
+        return
+    except Exception as e:
+        print("Lỗi: Không thể tải checkpoint.")
+        print(f"Chi tiết: {e}")
         return
 
     print("AI đang tính toán chuỗi sắp xếp tối ưu...")

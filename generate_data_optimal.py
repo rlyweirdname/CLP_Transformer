@@ -91,4 +91,4 @@ def generate_optimal_dataset(num_samples=2000, items_per_sample=20, filename="cl
     print(f"Xong! Đã lưu dữ liệu vào '{filename}'. Tỷ lệ lấp đầy mỗi mẫu đều là 100%!")
 
 if __name__ == "__main__":
-    generate_optimal_dataset(num_samples=2000, items_per_sample=80)
+    generate_optimal_dataset(num_samples=2000, items_per_sample=20)

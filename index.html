@@ -150,7 +150,7 @@
             <select id="algo-select"
                 class="w-full bg-slate-800 text-white rounded-lg p-2.5 text-sm border border-slate-700 focus:border-blue-500 outline-none transition">
                 <option value="ai">🧠 AI Transformer + Extreme Points 6D</option>
-                <option value="greedy">📦 Tham lam (Greedy Baseline)</option>
+                <option value="greedy">📦 Tham lam + Xoay 6D (Baseline)</option>
             </select>
         </div>
 
@@ -253,6 +253,114 @@
                 }
             }
             return unique;
+        }
+
+        function simulateGreedyPlacement(state, dims) {
+            const [l, w, h] = dims;
+            let x = state.x;
+            let y = state.y;
+            let z = state.z;
+            let rowMaxW = state.row_max_w;
+            let layerMaxH = state.layer_max_h;
+
+            if (x + l > ContainerConfig.L) {
+                x = 0;
+                y += rowMaxW;
+                rowMaxW = 0;
+            }
+
+            if (y + w > ContainerConfig.W) {
+                x = 0;
+                y = 0;
+                z += layerMaxH;
+                rowMaxW = 0;
+                layerMaxH = 0;
+            }
+
+            if (z + h > ContainerConfig.H) return null;
+
+            return {
+                place: { x, y, z, l, w, h },
+                nextState: {
+                    x: x + l,
+                    y,
+                    z,
+                    row_max_w: Math.max(rowMaxW, w),
+                    layer_max_h: Math.max(layerMaxH, h)
+                }
+            };
+        }
+
+        function chooseBestGreedyRotation(item, state) {
+            const rotations = getRotations(item.l, item.w, item.h);
+            let best = null;
+
+            for (const rot of rotations) {
+                const sim = simulateGreedyPlacement(state, rot);
+                if (!sim) continue;
+                const p = sim.place;
+                const score = [
+                    p.z, // Ưu tiên tầng thấp trước
+                    p.y, // Sau đó ưu tiên hàng sâu thấp hơn
+                    p.x, // Sau đó dịch trái nhất có thể
+                    ContainerConfig.H - (p.z + p.h), // Ưu tiên dùng chiều cao tốt hơn
+                    ContainerConfig.W - (p.y + p.w),
+                    ContainerConfig.L - (p.x + p.l)
+                ];
+
+                if (!best || compareLexicographic(score, best.score) < 0) {
+                    best = { score, sim };
+                }
+            }
+
+            return best ? best.sim : null;
+        }
+
+        function compareLexicographic(a, b) {
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] < b[i]) return -1;
+                if (a[i] > b[i]) return 1;
+            }
+            return 0;
+        }
+
+        function buildItemOrderBeamSearch(inputItems, predictedSeq, beamWidth = 4) {
+            if (!predictedSeq || predictedSeq.length === 0 || inputItems.length === 0) {
+                return [...inputItems];
+            }
+
+            let beams = [{ score: 0, order: [], used: new Set() }];
+
+            for (const predDims of predictedSeq) {
+                const nextBeams = [];
+
+                for (const beam of beams) {
+                    for (let i = 0; i < inputItems.length; i++) {
+                        if (beam.used.has(i)) continue;
+                        const it = inputItems[i];
+                        const diff = Math.abs(it.l - predDims[0]) + Math.abs(it.w - predDims[1]) + Math.abs(it.h - predDims[2]);
+                        const nextUsed = new Set(beam.used);
+                        nextUsed.add(i);
+                        nextBeams.push({
+                            score: beam.score + diff,
+                            order: [...beam.order, i],
+                            used: nextUsed
+                        });
+                    }
+                }
+
+                if (nextBeams.length === 0) break;
+                nextBeams.sort((a, b) => a.score - b.score);
+                beams = nextBeams.slice(0, beamWidth);
+            }
+
+            if (beams.length === 0) return [...inputItems];
+            const best = beams[0];
+            const orderedItems = best.order.map(idx => inputItems[idx]);
+            for (let i = 0; i < inputItems.length; i++) {
+                if (!best.used.has(i)) orderedItems.push(inputItems[i]);
+            }
+            return orderedItems;
         }
 
         // ==========================================
@@ -523,7 +631,7 @@
                     lastRunResult = null;
                     lastResultByMode = { ai: null, greedy: null };
                     globalRawItems = []; // Xóa bộ nhớ đệm
-                    for (let i = 0; i < 60; i++) {
+                    for (let i = 0; i < 80; i++) {
                         let newItem = new Item(i, Math.floor(Math.random() * 4) + 2, Math.floor(Math.random() * 3) + 2, Math.floor(Math.random() * 3) + 2);
                         globalRawItems.push({ id: newItem.id, l: newItem.l, w: newItem.w, h: newItem.h, color: newItem.color });
                     }
@@ -554,23 +662,11 @@
                         .then(response => response.json())
                         .then(data => {
                             const predictedSeq = data.predicted_sequence;
-                            let aiSortedItems = [];
-                            let unpackedItems = [...items];
-
-                            for (let predDims of predictedSeq) {
-                                if (unpackedItems.length === 0) break;
-                                let bestMatchIdx = 0;
-                                let minDiff = Infinity;
-                                for (let i = 0; i < unpackedItems.length; i++) {
-                                    let diff = Math.abs(unpackedItems[i].l - predDims[0]) + Math.abs(unpackedItems[i].w - predDims[1]) + Math.abs(unpackedItems[i].h - predDims[2]);
-                                    if (diff < minDiff) { minDiff = diff; bestMatchIdx = i; }
-                                }
-                                aiSortedItems.push(unpackedItems[bestMatchIdx]);
-                                unpackedItems.splice(bestMatchIdx, 1);
-                            }
-                            items = aiSortedItems;
+                            const beamWidth = 4;
+                            items = buildItemOrderBeamSearch(items, predictedSeq, beamWidth);
                             overlay.classList.add('hidden');
                             addLog("API PyTorch phản hồi: Phân tích Self-Attention hoàn tất!", "success");
+                            addLog(`Đã sắp thứ tự bằng Beam Search (k=${beamWidth}).`, "info");
                             addLog("Bắt đầu kích hoạt cánh tay Extreme Points 6D...", "info");
 
                             btnStep.disabled = false;
@@ -583,7 +679,7 @@
                 } else {
                     addLog("Chế độ Tham lam: Sắp xếp kiện hàng theo thể tích giảm dần...", "warning");
                     items.sort((a, b) => b.volume - a.volume);
-                    addLog("Sẵn sàng xếp hàng bằng logic Tham lam (Tịnh tiến tọa độ)!", "success");
+                    addLog("Sẵn sàng xếp hàng bằng logic Tham lam + thử xoay 6D!", "success");
                     btnStep.disabled = false;
                     btnAuto.disabled = false;
                 }
@@ -671,42 +767,25 @@
                 // ==========================================
                 // LUỒNG 2: THUẬT TOÁN THAM LAM - GREEDY BASELINE
                 // ==========================================
-                // Logic tịnh tiến mù quáng y hệt như file algorithms.py
                 let state = greedyState;
+                const bestGreedyPlacement = chooseBestGreedyRotation(item, state);
 
-                // 1. Kiểm tra tràn chiều dài (L) -> Xuống hàng mới (tăng Y)
-                if (state.x + item.l > ContainerConfig.L) {
-                    state.x = 0;
-                    state.y += state.row_max_w; // Phải cộng bề rộng lớn nhất của hàng trước
-                    state.row_max_w = 0; // Reset để tính lại cho hàng mới
-                }
+                if (bestGreedyPlacement) {
+                    const p = bestGreedyPlacement.place;
+                    item.x = p.x;
+                    item.y = p.y;
+                    item.z = p.z;
+                    item.l = p.l;
+                    item.w = p.w;
+                    item.h = p.h;
 
-                // 2. Kiểm tra tràn chiều rộng (W) -> Lên tầng mới (tăng Z)
-                if (state.y + item.w > ContainerConfig.W) {
-                    state.x = 0;
-                    state.y = 0;
-                    state.z += state.layer_max_h; // Phải cộng chiều cao lớn nhất của tầng trước
-                    state.row_max_w = 0;
-                    state.layer_max_h = 0; // Reset để tính lại cho tầng mới
-                }
-
-                // 3. Kiểm tra đụng trần (H)
-                if (state.z + item.h <= ContainerConfig.H) {
-                    item.x = state.x;
-                    item.y = state.y;
-                    item.z = state.z;
-
-                    // Cập nhật tọa độ X tiếp theo và lưu kỷ lục Max của hàng/tầng
-                    state.x += item.l;
-                    state.row_max_w = Math.max(state.row_max_w, item.w);
-                    state.layer_max_h = Math.max(state.layer_max_h, item.h);
-
+                    greedyState = bestGreedyPlacement.nextState;
                     item.isPacked = true;
                     packedItems.push(item);
                     drawItemIn3D(item);
-                    addLog(`✓ [Greedy] Đặt tại (${item.x}, ${item.y}, ${item.z})`, "warning");
+                    addLog(`✓ [Greedy+6D] Đặt tại (${item.x}, ${item.y}, ${item.z}) - xoay [${item.l}x${item.w}x${item.h}]`, "warning");
                 } else {
-                    addLog(`✗ Bỏ qua Kiện #${item.id}: Đã đụng trần container.`, "error");
+                    addLog(`✗ Bỏ qua Kiện #${item.id}: Không còn tư thế xoay nào hợp lệ trong container.`, "error");
                 }
             }
 

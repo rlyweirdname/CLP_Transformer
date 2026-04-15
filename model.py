@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+from typing import cast
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=100):
@@ -10,16 +11,17 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe', pe.unsqueeze(0)) # Thêm batch dimension
+        self.register_buffer('pe', pe.unsqueeze(0))  # type: Tensor
 
     def forward(self, x):
         # x shape: (batch_size, seq_len, d_model)
         seq_len = x.size(1)
-        x = x + self.pe[:, :seq_len, :]
+        pe = cast(torch.Tensor, self.pe)
+        x = x + pe[:, :seq_len, :]
         return x
 
 class Seq2SeqCLP(nn.Module):
-    def __init__(self, input_dim=3, hidden_dim=64, n_heads=4, n_layers=2):
+    def __init__(self, input_dim=3, hidden_dim=128, n_heads=4, n_layers=3, dropout=0.1):
         super(Seq2SeqCLP, self).__init__()
         
         self.embedding = nn.Linear(input_dim, hidden_dim)
@@ -32,7 +34,8 @@ class Seq2SeqCLP(nn.Module):
             nhead=n_heads,
             num_encoder_layers=n_layers,
             num_decoder_layers=n_layers,
-            batch_first=True
+            batch_first=True,
+            dropout=dropout
         )
         self.fc_out = nn.Linear(hidden_dim, input_dim)
 

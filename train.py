@@ -24,7 +24,7 @@ def train_model():
     # 2. CÀI ĐẶT THÔNG SỐ HUẤN LUYỆN (Hyperparameters)
     batch_size = 32
     learning_rate = 0.001
-    num_epochs = 20 # Số vòng lặp qua toàn bộ dữ liệu
+    num_epochs = 10 # Số vòng lặp qua toàn bộ dữ liệu
     
     # Load dữ liệu từ file bạn vừa tạo
     print("Đang tải dữ liệu...")
@@ -32,7 +32,7 @@ def train_model():
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     # 3. KHỞI TẠO MÔ HÌNH, HÀM MẤT MÁT VÀ BỘ TỐI ƯU
-    model = Seq2SeqCLP()
+    model = Seq2SeqCLP(n_layers=3)
     criterion = nn.MSELoss() # Dùng MSE vì dự đoán tọa độ/kích thước là bài toán Hồi quy (Regression)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
